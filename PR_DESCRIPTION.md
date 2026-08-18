@@ -2,8 +2,8 @@
 
 ## Reviewing this PR
 
-Hand-written changes are in **10 files** — everything else is
-regenerated build output:
+Changes were made in **10 files** — everything else is regenerated
+build output:
 
 - language & docs: `teal/reader.tl`, `teal/ast.tl`, `teal/block.tl`,
   `teal/types.tl`, `teal/check/{context,relations,visitors}.tl`,
