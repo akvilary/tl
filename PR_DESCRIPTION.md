@@ -86,8 +86,18 @@ pattern cannot express on top of it:
   every `init` in the hierarchy, root parent first, each exactly once —
   something each hand-rolled constructor would have to re-implement
   (and usually doesn't);
-- single inheritance with compile-time method flattening, default-value
-  merging (child overrides win) and inheritable static fields.
+- a `static ... end` block for type-level fields (constants, shared
+  counters): they get a proper declaration site, are set once at load
+  time, are readable through instances via `__index`, and `.new`
+  rejects them in opts. Today this is ad-hoc discipline — assignments
+  scattered after the type definition, invisible to the type checker;
+- single inheritance with compile-time method flattening and
+  default-value merging (child overrides win). Children also inherit
+  the parent's static fields automatically: `Dog.KINGDOM` and
+  `Dog.count` just work, whereas the hand-written pattern only wires
+  *instances* (`setmetatable({}, { __index = Animal })`) — for the
+  class table itself to see the parent's members you'd need a second
+  metatable on `Dog`, a subtlety most users get wrong.
 
 `record` remains the tool for plain data; `struct` is for when you would
 otherwise reach for `setmetatable` by hand.
