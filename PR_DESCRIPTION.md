@@ -31,11 +31,17 @@ on beside it (see Compatibility for exactly what that means).
 ```lua
 local struct Animal
    name: string
-   sound: string
+   sound: string = "..."         -- field default
+   legs: number = 4
+
+   static                       -- type-level fields
+      KINGDOM: string = "Animalia"
+      count: number = 0
+   end
 end
 
-function Animal:init()
-   self.sound = self.sound or "<silence>"
+function Animal:init()          -- lifecycle hook, chained root->leaf
+   Animal.count = Animal.count + 1
 end
 
 function Animal:speak(): string
@@ -52,6 +58,8 @@ end
 
 local d = Dog.new { name = "Rex", breed = "Labrador" }
 print(d:speak())                 --> Rex says Woof
+print(d.legs, d.KINGDOM)         --> 4    Animalia (default; static via __index)
+print(Animal.count)              --> 1
 ```
 
 ## Motivation
