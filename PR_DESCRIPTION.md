@@ -210,6 +210,37 @@ the comparison (each struct's opts record reflects its own fields).
 | parent via alias | `local type P = Point; struct T:P` resolves to `Point` |
 | cross-module parent | `local A = require("animal")` (module returns the struct directly) — see below |
 
+Instance vs static methods follow Lua's own convention — colon vs dot:
+
+```lua
+local struct Temperature
+   celsius: number
+
+   static
+      ABSOLUTE_ZERO: number = -273.15
+   end
+end
+
+-- static method: dot syntax, no self — a factory on the type
+function Temperature.from_fahrenheit(f: number): Temperature
+   return Temperature.new { celsius = (f - 32) * 5 / 9 }
+end
+
+-- instance method: colon syntax, self is the instance
+function Temperature:to_fahrenheit(): number
+   return self.celsius * 9 / 5 + 32
+end
+
+local t = Temperature.from_fahrenheit(212)
+print(t:to_fahrenheit())          --> 212.0
+print(Temperature.ABSOLUTE_ZERO)  --> -273.15
+```
+
+Static methods are ordinary record functions, so children inherit them
+through the same compile-time flattening: `Precise.from_fahrenheit(32)`
+works and returns a `Temperature` (the declared return type — a factory
+for the child would be declared on the child).
+
 ### Nominal construction
 
 Table literals are rejected where a struct instance is expected
