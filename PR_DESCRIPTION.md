@@ -62,6 +62,17 @@ print(d.legs, d.KINGDOM)         --> 4    Animalia (default; static via __index)
 print(Animal.count)              --> 1
 ```
 
+Two design decisions define the whole feature:
+
+1. **Inheritance is strictly single.** A struct has at most one parent
+   (`struct Dog:Animal`); there is no multiple inheritance, no mixins,
+   no diamond problem — ever. This keeps both the type checker story and
+   the generated code linear and predictable.
+2. **Method calls have zero dispatch.** No lookup chains, no metatable
+   walks, no runtime resolution: inheritance is fully resolved at
+   compile time, and a method call on an instance is a *single table
+   lookup*. Details and generated code below.
+
 ## Motivation
 
 The most common Teal OOP pattern today is hand-written metatable
@@ -169,7 +180,7 @@ end
 Every `init` runs exactly once, parent to child. Calling a parent hook
 from user code is by name: `A.init(self)`.
 
-### Method flattening
+### Method flattening: no dispatch, ever
 
 At the point a child struct is declared, every method known on its
 parent is copied into it:
