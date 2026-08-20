@@ -312,19 +312,21 @@ rejections, each with a clear error:
 
 ## Testing
 
-63 new specs in `spec/lang/declaration/struct_spec.lua`, covering:
+ 67 new specs in `spec/lang/declaration/struct_spec.lua`, covering:
 construction, defaults (well-typed, mistyped, falsy, inherited,
 overridden), init chaining (including skipping init-less ancestors and
 exact-once semantics), method flattening and overrides, statics
 (inheritance, `.new` rejection, single-block rule), subtyping and
 upcasts, alias and cross-module parents (positive + all four guarded
-rejections), reserved-name errors, and a general acceptance battery
+rejections), reserved-name errors, declaration-order enforcement
+(parent methods/init after child structs are rejected, including the
+body-field-then-implementation case), and a general acceptance battery
 (metamethods in struct bodies, array interfaces + inheritance,
 recursion, 50-deep chains — the latter also verifies the generated
 constructors stay linear: one `if` per defaulted field, zero spurious
 init calls).
 
-Full suite: 1988 passing (1781 lang / 96 api / 111 cli).
+Full suite: 1993 passing (1785 lang / 96 api / 112 cli).
 
 ## Documentation
 
@@ -335,9 +337,11 @@ flattening, with a per-feature runtime cost table.
 
 ## Limitations & future work
 
-- Parent methods must precede child struct declarations (flattening is
-  a one-time, declaration-site operation). The checker enforces the
-  order.
+- Parent methods (including `init`) must precede child struct
+  declarations: flattening and init chaining capture the parent's state
+  at each child's declaration, so late declarations would silently not
+  reach the children. The checker rejects them with a clear error
+  ("declare parent methods before child structs").
 - Generic structs are rejected with a clear error; supporting
   `struct X<T>` is the natural follow-up.
 - No multiple inheritance, no `super` — intentional; parent members
