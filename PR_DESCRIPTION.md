@@ -123,6 +123,42 @@ way it does: **everything inheritance-related is paid once per struct at
 load time — never per instance, never per method call.** There is no
 dispatch anywhere.
 
+### Why so austere? Because `struct` is a floor, not a ceiling
+
+This austerity is deliberate. `struct` is intentionally the *simplest*
+thing that removes the metatable boilerplate: a plain table, a plain
+`__index`, explicit copies (`X.m = P.m`, `X.static = P.static`), direct
+calls. Everything it emits is visible in one screen of generated Lua,
+teachable without explaining metatables, and debuggable with `print`.
+
+Concretely, the two decisions that follow from that:
+
+- **No dispatch, ever.** A method call is one table lookup; the init
+  chain is a fixed list of unconditional calls. Runtime method
+  resolution (virtual calls, method added to a parent after the fact,
+  `super` navigation) requires exactly the machinery we left out —
+  metatable chains between class tables — and every such chain makes
+  the simple cases slower and the error cases farther away.
+- **Static fields are copied by reference at declaration, not
+  resolved dynamically.** `Child.config = Parent.config` means struct
+  instances stored in statics are shared by the whole hierarchy (the
+  common configuration/singleton/pool pattern just works), while
+  *rebinding* a scalar static on the parent after a child exists is
+  not visible to that child. We consider that a fair trade: shared
+  mutable state is expressed by mutating a shared instance, which is
+  unambiguous, instead of rebinding slots, which is where dynamic
+  lookup actually starts to matter.
+
+None of this is a judgment against virtualization — it is a scope
+decision. A future `class` keyword (or a community library) can build
+dynamic dispatch, `super`, and late-bound members *on top of* these
+semantics or beside them, the way richer OOP layers historically build
+on Lua's primitives. Keeping `struct` minimal leaves that space open:
+it does not preempt the design questions a `class` would need to answer
+(multiple dispatch? MRO? open classes?), and users who never need them
+never pay for them. `record` for plain data, `struct` for OOP without
+ceremony, `class` — maybe, one day, with all of it.
+
 ### The generated `.new`
 
 ```lua
@@ -355,8 +391,13 @@ flattening, with a per-feature runtime cost table.
   ("declare parent methods before child structs").
 - Generic structs are rejected with a clear error; supporting
   `struct X<T>` is the natural follow-up.
-- No multiple inheritance, no `super` — intentional; parent members
-  are reachable by name.
+- No multiple inheritance, no `super`, no runtime dispatch —
+  intentional; parent members are reachable by name. This is the
+  floor-not-ceiling scoping discussed under *Design principle*: if
+  the community wants virtualization and dynamic method resolution,
+  the natural home is a future `class` layer built beside (or on top
+  of) these primitives, answering its own design questions — `struct`
+  itself should stay the maximally simple structure it is.
 - `init` takes no arguments besides `self`; construction data flows
   through the `.new` opts table.
 
