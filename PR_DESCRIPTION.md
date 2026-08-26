@@ -98,17 +98,20 @@ pattern cannot express on top of it:
   something each hand-rolled constructor would have to re-implement
   (and usually doesn't);
 - a `static ... end` block for type-level fields (constants, shared
-  counters): they get a proper declaration site, are set once at load
+  state): they get a proper declaration site, are set once at load
   time, are readable through instances via `__index`, and `.new`
   rejects them in opts. Today this is ad-hoc discipline — assignments
   scattered after the type definition, invisible to the type checker;
 - single inheritance with compile-time method flattening and
   default-value merging (child overrides win). Children also inherit
-  the parent's static fields automatically: `Dog.KINGDOM` and
-  `Dog.count` just work, whereas the hand-written pattern only wires
-  *instances* (`setmetatable({}, { __index = Animal })`) — for the
-  class table itself to see the parent's members you'd need a second
-  metatable on `Dog`, a subtlety most users get wrong.
+  the parent's static fields: inherited statics are copied **by
+  reference** at the child's declaration (`Dog.config = Animal.config`),
+  so struct instances stored in statics are shared by the whole
+  hierarchy — the common configuration/singleton/pool pattern works
+  with zero dispatch. The hand-written pattern only wires *instances*
+  (`setmetatable({}, { __index = Animal })`) — for the class table
+  itself to see the parent's members you'd need a second metatable on
+  `Dog`, a subtlety most users get wrong.
 
 `record` remains the tool for plain data; `struct` is for when you would
 otherwise reach for `setmetatable` by hand.
@@ -216,7 +219,7 @@ the comparison (each struct's opts record reflects its own fields).
 | instance methods | `function X:m(...)` (colon) |
 | static methods | `function X.m(...)` (dot) |
 | field defaults | `x: number = 0` — typechecked against the field type |
-| static fields | `static ... end` block; excluded from `.new` opts; initializers emitted once on the type; inherited |
+| static fields | `static ... end` block; excluded from `.new` opts; own initializers emitted once on the type; inherited statics copied by reference at the child's declaration (instance statics shared hierarchy-wide) |
 | inheritance | `local struct Dog:Animal` — single parent; fields, defaults, statics and methods are inherited |
 | parent via alias | `local type P = Point; struct T:P` resolves to `Point` |
 | cross-module parent | `local A = require("animal")` (module returns the struct directly) — see below |
@@ -278,7 +281,12 @@ rejections, each with a clear error:
 ### Explicit rejections (clear errors, not surprises)
 
 - user-declared `X.new` (reserved; the error suggests `init`)
-- data field named `new` in the body
+- data fields named `new` or `init` in the body (both are reserved:
+  the synthesized constructor and the lifecycle hook)
+- `struct A:A` (self-inheritance)
+- casting a table literal to a struct type (`{ ... } as Point`) — the
+  result would lack the metatable wiring; casting variables remains
+  the interop escape hatch
 - `static` blocks and `:Parent` in `record`/`interface` declarations
 - nested structs — in both forms (`struct Inner ... end` and
   `type Inner = struct ... end` inside a type body); structs declared
@@ -312,21 +320,24 @@ rejections, each with a clear error:
 
 ## Testing
 
- 67 new specs in `spec/lang/declaration/struct_spec.lua`, covering:
+ 75 new specs in `spec/lang/declaration/struct_spec.lua`, covering:
 construction, defaults (well-typed, mistyped, falsy, inherited,
 overridden), init chaining (including skipping init-less ancestors and
 exact-once semantics), method flattening and overrides, statics
-(inheritance, `.new` rejection, single-block rule), subtyping and
+(inheritance by reference — including runtime-verified sharing of
+static struct instances across the hierarchy — scalar snapshots,
+shadowing, `.new` rejection, single-block rule), subtyping and
 upcasts, alias and cross-module parents (positive + all four guarded
-rejections), reserved-name errors, declaration-order enforcement
-(parent methods/init after child structs are rejected, including the
-body-field-then-implementation case), and a general acceptance battery
+rejections), reserved-name errors (`new`, `init`), declaration-order
+enforcement (parent methods/init after child structs are rejected,
+including the body-field-then-implementation case), self-inheritance
+and table-literal casts, and a general acceptance battery
 (metamethods in struct bodies, array interfaces + inheritance,
 recursion, 50-deep chains — the latter also verifies the generated
 constructors stay linear: one `if` per defaulted field, zero spurious
 init calls).
 
-Full suite: 1993 passing (1785 lang / 96 api / 112 cli).
+Full suite: 2001 passing (1793 lang / 96 api / 112 cli).
 
 ## Documentation
 
